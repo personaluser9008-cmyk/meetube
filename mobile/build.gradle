@@ -157,7 +157,7 @@ android {
     
     defaultConfig {
         // values linked with applicationId: searchable.searchSuggestAuthority, searchable.searchSuggestIntentData, VideoContract.CONTENT_AUTHORITY
-        applicationId "app.smarttube"
+        applicationId "com.sstube.app"
         minSdk = project.ext.minSdkVersion
         targetSdk = project.ext.targetSdkVersion
         versionCode 2387
