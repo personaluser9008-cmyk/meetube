@@ -1,0 +1,67 @@
+name: Build Signed Custom Mobile APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Auto-Rename MeeTube in Visible Text
+        run: |
+          python3 -c '
+          import glob, re
+          APP_NAME = "SSTube"
+          for path in glob.glob("mobile/src/stmobile/res/values*/*.xml"):
+              with open(path, "r", encoding="utf-8") as f:
+                  text = f.read()
+              new_text = re.sub(r">([^<]+)<", lambda m: ">" + m.group(1).replace("MeeTube", APP_NAME) + "<", text)
+              if new_text != text:
+                  with open(path, "w", encoding="utf-8") as f:
+                      f.write(new_text)
+          '
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          validate-wrappers: false
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Mobile Release APK
+        run: ./gradlew :mobile:assembleStmobileRelease
+
+      - name: Sign arm64-v8a Release APK
+        run: |
+          openssl enc -d -aes-256-cbc -pbkdf2 -in ssyoutube.jks.enc -out keystore.jks -pass pass:Sunil1234
+          INPUT_APK=$(find mobile/build/outputs -type f -name "*arm64-v8a*.apk" | head -n 1)
+          [ -z "$INPUT_APK" ] && INPUT_APK=$(find mobile/build/outputs -type f -name "*.apk" | head -n 1)
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          $BUILD_TOOLS/zipalign -p -f -v 4 "$INPUT_APK" aligned.apk
+          $BUILD_TOOLS/apksigner sign --ks keystore.jks \
+            --ks-key-alias "ssyoutube" \
+            --ks-pass "pass:Sunil1234" \
+            --key-pass "pass:Sunil1234" \
+            --out SSTube-Release.apk aligned.apk
+
+      - name: Upload Signed Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SSTube-Release-APK
+          path: SSTube-Release.apk
+          
